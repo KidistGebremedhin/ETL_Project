@@ -1,0 +1,160 @@
+-- Based on a list of my ingredients, what pertenage of the ingriendients do I have on hand for each recipe?
+
+--DROP TABLE dessert_ingredient_stats;
+CREATE TEMPORARY TABLE dessert_ingredient_stats
+AS
+SELECT dessert_name,
+cnt_ingredient_on_hand,
+cnt_Shooping_list ,
+total_ingredients,
+ROUND ((cnt_ingredient_on_hand/total_ingredients::float)*100) AS "on_hand_precentage(%)",
+ROUND ((cnt_Shooping_list/total_ingredients::float)*100) AS "shoping_list_precentage(%)"
+FROM (
+SELECT DISTINCT d.dessert_name, 
+Count(CASE WHEN (ing.ingredient = lst.ingredient)  THEN ing.ingredient END) AS cnt_ingredient_on_hand,
+Count(CASE WHEN (lst.ingredient != ing.ingredient) THEN ing.ingredient END) AS cnt_Shooping_list,
+Count(ing.ingredient_id) AS total_ingredients
+FROM recipes_jct cjt
+INNER JOIN ingredient_lkp ing
+ON ing.ingredient_id = cjt.ingredient_id
+INNER JOIN dessert_list d
+ON d.dessert_id = cjt.dessert_id
+Inner join
+(SELECT distinct d.dessert_id,ing.ingredient
+FROM recipes_jct cjt
+INNER JOIN ingredient_lkp ing
+ON ing.ingredient_id = cjt.ingredient_id
+INNER JOIN dessert_list d
+ON d.dessert_id = cjt.dessert_id
+WHERE ingredient IN ('all-purpose flour','white sugar','eggs' ,'milk','vegetable oil','butter')) lst
+ON d. dessert_id = lst.dessert_id
+Group By dessert_name) recp;
+
+SELECT *
+FROM dessert_ingredient_stats 
+ORDER BY "on_hand_precentage(%)" DESC;
+
+-- Now filter the list down for recipes where I have 25% or more of the ingredients on hand and show me the star rating. 
+
+SELECT DISTINCT d.dessert_name,
+total_ingredients,"on_hand_precentage(%)","shoping_list_precentage(%)", star_rating
+FROM dessert_ingredient_stats st
+INNER JOIN dessert_list d
+ON st.dessert_name = d.dessert_name
+INNER JOIN recipes_jct jct
+ON d.dessert_id = jct.dessert_id
+INNER JOIN ingredient_lkp ing
+ON ing.ingredient_id = jct.ingredient_id
+WHERE "on_hand_precentage(%)" >= 25
+ORDER BY "on_hand_precentage(%)",star_rating DESC;
+
+
+
+-- Dessert count by star rating 
+
+SELECT count (dessert_id) as dessert_count,star_rating
+FROM dessert_list
+GROUP BY star_rating
+ORDER BY star_rating desc;
+
+-- Count of Cake and Pie recipes
+
+SELECT COUNT(case when dessert_name LIKE '%Cake%' then dessert_id end) Cake_recipes_count,
+       COUNT(case when dessert_name LIKE '%Pie%' then dessert_id end) Pie_recipes_count
+FROM dessert_list;
+
+-- I really want dessert but I can have too much sugar, what should I make?
+
+SELECT distinct dessert_name
+FROM dessert_list 
+EXCEPT
+SELECT distinct dessert_name
+FROM recipes_jct cjt
+INNER JOIN ingredient_lkp ing
+ON ing.ingredient_id = cjt.ingredient_id
+INNER JOIN dessert_list d
+ON d.dessert_id = cjt.dessert_id
+WHERE ingredient LIKE '%sugar%';
+
+-- Sugar analysis - what is the count of recipies that don't include sugar and what is that as a percentage of all recipes
+
+SELECT cnt_sugary_dessert,
+cnt_sugar_free_dessert,
+ROUND ((cnt_sugar_free_dessert/(cnt_sugary_dessert+cnt_sugar_free_dessert)::float)*100) AS "sugar_free_precentage(%)"
+FROM (
+SELECT COUNT(case when sug.dessert_name is not null then dessert_id end) AS cnt_sugar_free_dessert ,
+       COUNT(case when sug.dessert_name is null then dessert_id end) AS cnt_sugary_dessert
+FROM dessert_list d
+LEFT OUTER JOIN (
+SELECT distinct dessert_name
+FROM dessert_list 
+EXCEPT
+SELECT distinct dessert_name
+FROM recipes_jct cjt
+INNER JOIN ingredient_lkp ing
+ON ing.ingredient_id = cjt.ingredient_id
+INNER JOIN dessert_list d
+ON d.dessert_id = cjt.dessert_id
+WHERE ingredient LIKE '%sugar%') sug
+ON d.dessert_name = sug.dessert_name) stat;
+
+
+-- Identify on hand ingredient and shopping list 
+
+SELECT DISTINCT d.dessert_name ,
+CASE WHEN ing.ingredient_id  = lst.ingredient_id  THEN ing.ingredient ELSE null END AS ingredient_on_hand,
+CASE WHEN ing.ingredient_id  NOT IN (2,7,25,26,34,40,95) THEN ing.ingredient  ELSE null END AS Shooping_list
+FROM recipes_jct cjt
+INNER JOIN ingredient_lkp ing
+ON ing.ingredient_id = cjt.ingredient_id
+INNER JOIN dessert_list d
+ON d.dessert_id = cjt.dessert_id
+INNER JOIN
+(SELECT distinct d.dessert_id,ing.ingredient_id
+FROM recipes_jct cjt
+INNER JOIN ingredient_lkp ing
+ON ing.ingredient_id = cjt.ingredient_id
+INNER JOIN dessert_list d
+ON d.dessert_id = cjt.dessert_id
+WHERE ingredient IN ('all-purpose flour','white sugar','eggs','milk','whole milk','vegetable oil','butter')) lst
+ON d. dessert_id = lst.dessert_id 
+ORDER BY d.dessert_name ASC; 
+
+-- Gather metadata table for a single recipe
+
+SELECT distinct 
+dessert_name ,
+prep_time, 
+cook_time, 
+servings,
+recipe_yield,
+number_of_rankings, 
+star_rating,
+number_of_reviews
+FROM dessert_list 
+WHERE dessert_name = 'Lemon Blueberry Cake';
+
+-- Gather directions for a single recipe
+
+SELECT distinct 
+dessert_name ,
+steps,
+directions
+FROM dessert_list d
+INNER JOIN directions dr
+ON dr.dessert_id = d.dessert_id
+WHERE dessert_name = 'Lemon Blueberry Cake';
+
+-- Gather ingredients for a single recipe
+
+SELECT distinct 
+dessert_name ,
+ingredient
+FROM dessert_list d
+INNER JOIN recipes_jct cjt
+ON d.dessert_id = cjt.dessert_id
+INNER JOIN ingredient_lkp  ing
+ON ing.ingredient_id = cjt.ingredient_id
+WHERE dessert_name = 'Lemon Blueberry Cake';
+
+
