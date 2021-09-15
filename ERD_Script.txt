@@ -1,0 +1,49 @@
+# Modify this code to update the DB schema diagram.
+# To reset the sample schema, replace everything with
+# two dots ('..' - without quotes).
+
+measurement_type_lkp
+-
+measurement_type_id pk serail 
+measurement_type varchar(50)
+last_updated datetime
+
+ingredient_lkp
+-
+ingredient_id pk serail 
+ingredient varchar(100)
+last_updated datetime
+
+dessert_list
+-
+dessert_id  pk serial 
+dessert_name varchar(100)
+prep_time varchar(50)
+cook_time varchar(50)
+additional_time varchar(50)
+total_time varchar(50)
+servings int
+recipe_yield varchar(50)
+number_of_rankings varchar(50)
+star_rating int
+number_of_reviews varchar(50)
+blerb varchar
+url  varchar(250)
+last_updated datetime
+
+directions
+-
+directions_id pk serial
+dessert_id int FK >- dessert_list.dessert_id
+steps Varchar(20)
+direcrions varchar(720)
+last_updated datetime
+
+recipes_jct
+-
+id pk serial 
+dessert_id int FK >- dessert_list.dessert_id
+ingredient_id int FK >- ingredient_lkp.ingredient_id
+measurement_type_id varchar(50) FK >- measurement_type_lkp.measurement_type_id
+measurment_value  int
+last_updated datetime
